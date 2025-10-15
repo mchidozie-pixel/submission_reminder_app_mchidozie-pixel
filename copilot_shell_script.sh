@@ -1,41 +1,61 @@
-#!/usr/bin/env bash
+#!/bin/bash
 # copilot_shell_script.sh
-# Prompts user for an assignment name and updates ASSIGNMENT in config/config.env
-set -euo pipefail
+# Task 2: Prompts for a new assignment name, updates the config file, and reruns the app.
 
-read -p "Enter the new assignment name (e.g., Assignment2): " NEW_ASSIGNMENT
+# --- 1. Locate the Application Directory ---
+# Attempt to auto-detect the app directory
+APP_DIR_CANDIDATES=$(find . -maxdepth 1 -type d -name "submission_reminder_*" -print -quit)
 
-# Try to find a config.env file under submission_reminder_* directories
-CONFIG_PATH="$(find . -maxdepth 3 -type f -path "./submission_reminder_*/*/config/config.env" -print | head -n1 || true)"
-
-# If not found using that pattern, fallback to any config/config.env found in two levels
-if [ -z "$CONFIG_PATH" ]; then
-  CONFIG_PATH="$(find . -maxdepth 3 -type f -path "*/config/config.env" -print | head -n1 || true)"
-fi
-
-if [ -z "$CONFIG_PATH" ]; then
-  echo "config/config.env not found in the repository. Please run this script from the repository root or provide the path."
-  read -p "Or enter the full path to config.env: " MANUAL_PATH
-  if [ -f "$MANUAL_PATH" ]; then
-    CONFIG_PATH="$MANUAL_PATH"
-  else
-    echo "Provided path is invalid. Exiting."
-    exit 1
-  fi
-fi
-
-# Back up original
-cp -v "$CONFIG_PATH" "${CONFIG_PATH}.bak"
-
-# Use sed to replace the ASSIGNMENT line. Handles forms:
-# ASSIGNMENT=foo  OR ASSIGNMENT="foo"
-# If ASSIGNMENT key doesn't exist, append it.
-if grep -qE '^ASSIGNMENT=' "$CONFIG_PATH"; then
-  sed -E -i'' -e "s#^ASSIGNMENT=.*#ASSIGNMENT=\"${NEW_ASSIGNMENT}\"#" "$CONFIG_PATH"
+if [ -n "$APP_DIR_CANDIDATES" ]; then
+    APP_DIR=$(basename "$APP_DIR_CANDIDATES")
+    echo "Detected application directory: $APP_DIR"
 else
-  echo "ASSIGNMENT=\"${NEW_ASSIGNMENT}\"" >> "$CONFIG_PATH"
+    # If not found, prompt the user
+    read -p "No application directory found. Please enter the name of your app directory (e.g., submission_reminder_John): " APP_DIR
+    if [ ! -d "$APP_DIR" ]; then
+        echo "Error: Directory '$APP_DIR' not found."
+        exit 1
+    fi
 fi
 
-echo "Updated ASSIGNMENT in $CONFIG_PATH to: $NEW_ASSIGNMENT"
-echo "Backup saved as ${CONFIG_PATH}.bak"
-echo "You can now run the app's startup script to check non-submissions (e.g., ./submission_reminder_<yourName>/startup.sh)"
+CONFIG_FILE="$APP_DIR/config/config.env"
+STARTUP_SCRIPT="$APP_DIR/startup.sh"
+
+# Check required files
+if [ ! -f "$CONFIG_FILE" ]; then
+    echo "Error: Configuration file not found at $CONFIG_FILE"
+    exit 1
+fi
+if [ ! -f "$STARTUP_SCRIPT" ]; then
+    echo "Error: Startup script not found at $STARTUP_SCRIPT"
+    exit 1
+fi
+
+# --- 2. Prompt for new assignment name ---
+read -p "Enter the new assignment name to check (e.g., Midterm Exam): " new_assignment_name
+
+# Check if the input is empty
+if [ -z "$new_assignment_name" ]; then
+    echo "Assignment name cannot be empty. Aborting."
+    exit 1
+fi
+
+# --- 3. Update config.env using sed ---
+echo "Updating configuration for ASSIGNMENT to '$new_assignment_name' in $CONFIG_FILE..."
+
+# Use sed for in-place replacement of the ASSIGNMENT line.
+# Note: The .bak extension is used for cross-platform compatibility with -i (especially on macOS).
+# The pattern ^ASSIGNMENT=.*$ matches the entire line starting with ASSIGNMENT=
+sed -i.bak "s/^ASSIGNMENT=.*$/ASSIGNMENT=\"$new_assignment_name\"/" "$CONFIG_FILE"
+
+# Clean up the backup file created by sed (if any)
+rm -f "$CONFIG_FILE.bak"
+
+echo "Configuration updated successfully."
+
+# --- 4. Rerun startup.sh ---
+echo "Rerunning the Submission Reminder App with the new assignment: '$new_assignment_name'"
+sh "$STARTUP_SCRIPT"
+
+echo "Copilot script execution complete."
+
