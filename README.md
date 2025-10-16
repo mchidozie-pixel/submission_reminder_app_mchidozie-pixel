@@ -1,3 +1,5 @@
+# submission_reminder_app_mchidozie-pixel
+Shell scripts to set up and run a student submission reminder app.
 Submission Reminder App
 This repository contains two primary shell scripts designed to set up and manage a simple submission reminder application environment.
 
@@ -72,4 +74,3 @@ Merge to Main: Once testing is complete and only the required files are committe
 
 git checkout main
 git merge feature/setup
-
